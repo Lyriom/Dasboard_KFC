@@ -1,0 +1,31 @@
+services:
+  api:
+    build: .
+    container_name: kfc-dasboard-installs-api
+    env_file:
+      - .env
+    ports:
+      - "8030:8030"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: kfc-app-installs-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kfc_app_installs}
+      POSTGRES_USER: ${POSTGRES_USER:-kfc_app_installs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kfc_app_installs}
+    volumes:
+      - kfc_app_installs_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kfc_app_installs} -d ${POSTGRES_DB:-kfc_app_installs}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  kfc_app_installs_pgdata:
