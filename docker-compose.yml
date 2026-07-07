@@ -12,20 +12,21 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: mariadb:11.4
     container_name: kfc-app-installs-db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-kfc_app_installs}
-      POSTGRES_USER: ${POSTGRES_USER:-kfc_app_installs}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kfc_app_installs}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-kfc_app_installs}
+      MARIADB_USER: ${MARIADB_USER:-kfc_app_installs}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-kfc_app_installs}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-kfc_app_installs_root}
     volumes:
-      - kfc_app_installs_pgdata:/var/lib/postgresql/data
+      - kfc_app_installs_mariadb_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kfc_app_installs} -d ${POSTGRES_DB:-kfc_app_installs}"]
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u\"$${MARIADB_USER}\" -p\"$${MARIADB_PASSWORD}\" --silent"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
     restart: unless-stopped
 
 volumes:
-  kfc_app_installs_pgdata:
+  kfc_app_installs_mariadb_data:
