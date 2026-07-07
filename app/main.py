@@ -8,6 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.aggregation import isoformat_z
@@ -91,10 +92,7 @@ def dashboard(
             force_refresh=False,
         )
     except DashboardUnavailable as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Dashboard cache is unavailable",
-        ) from exc
+        return _dashboard_unavailable_response()
 
 
 @app.post("/api/kfc-app-installs/refresh")
@@ -118,10 +116,16 @@ def refresh(
         response["updatedAt"] = payload["updatedAt"]
         return response
     except WindsorError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Windsor refresh failed",
-        ) from exc
+        try:
+            return get_dashboard(
+                db,
+                request_settings,
+                from_date=start,
+                to_date=end,
+                force_refresh=False,
+            )
+        except DashboardUnavailable:
+            return _dashboard_unavailable_response()
 
 
 @app.post("/api/kfc-app-installs/share")
@@ -168,10 +172,7 @@ def public_dashboard(
             public=True,
         )
     except DashboardUnavailable as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Dashboard cache is unavailable",
-        ) from exc
+        return _dashboard_unavailable_response()
 
 
 def _validated_range(
@@ -200,3 +201,10 @@ def _scheduled_refresh() -> None:
         )
     finally:
         db.close()
+
+
+def _dashboard_unavailable_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"error": "No hay snapshot disponible y Windsor.ai no respondió a tiempo."},
+    )
