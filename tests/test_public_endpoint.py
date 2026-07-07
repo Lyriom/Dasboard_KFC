@@ -75,7 +75,47 @@ def test_public_endpoint_does_not_expose_private_fields() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert "shareToken" not in payload
-    assert "isMock" not in payload
+    assert payload["isMock"] is False
     assert "sourceError" not in payload
     assert "rawRows" not in payload
     assert payload["weeks"] == []
+
+
+def test_revoked_public_token_returns_404() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    Base.metadata.create_all(bind=engine)
+
+    db = TestingSessionLocal()
+    now = datetime.now(timezone.utc)
+    db.add(
+        KfcAppInstallsShare(
+            share_token="revoked-token",
+            shared_at=now,
+            revoked_at=now,
+            created_by_oid="private-oid",
+            created_by_email="private@example.com",
+        )
+    )
+    db.commit()
+    db.close()
+
+    def override_get_db():
+        session = TestingSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        client = TestClient(app)
+        response = client.get("/api/public/kfc-app-installs/revoked-token")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
