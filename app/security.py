@@ -25,7 +25,14 @@ def get_current_user(
     authorization: Annotated[Optional[str], Header()] = None,
     settings: Settings = Depends(get_settings),
 ) -> AuthUser:
-    if settings.auth_disabled:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing bearer token",
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+    if settings.auth_disabled and token == settings.auth_disabled_token:
         return AuthUser(
             oid="local-auth-disabled",
             email="local@example.com",
@@ -33,11 +40,13 @@ def get_current_user(
             claims={},
         )
 
-    if not authorization or not authorization.lower().startswith("bearer "):
+    try:
+        jwt.get_unverified_header(token)
+    except jwt.PyJWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing bearer token",
-        )
+            detail="Invalid bearer token",
+        ) from exc
 
     if not settings.azure_jwks_url or not settings.azure_client_ids:
         raise HTTPException(
@@ -45,9 +54,11 @@ def get_current_user(
             detail="Authentication is not configured",
         )
 
-    token = authorization.split(" ", 1)[1].strip()
     try:
-        jwks_client = _get_jwks_client(settings.azure_jwks_url)
+        jwks_client = _get_jwks_client(
+            settings.azure_jwks_url,
+            settings.auth_jwks_timeout_seconds,
+        )
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         claims = jwt.decode(
             token,
@@ -72,7 +83,10 @@ def get_current_user(
     )
 
 
-def require_dashboard_role(user: AuthUser = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> AuthUser:
+def require_dashboard_role(
+    user: AuthUser = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> AuthUser:
     allowed = settings.allowed_role_set
     if not {role.lower() for role in user.roles}.intersection(allowed):
         raise HTTPException(
@@ -82,10 +96,11 @@ def require_dashboard_role(user: AuthUser = Depends(get_current_user), settings:
     return user
 
 
-def _get_jwks_client(url: str) -> PyJWKClient:
-    if url not in _jwks_clients:
-        _jwks_clients[url] = PyJWKClient(url)
-    return _jwks_clients[url]
+def _get_jwks_client(url: str, timeout_seconds: float) -> PyJWKClient:
+    cache_key = f"{url}|{timeout_seconds}"
+    if cache_key not in _jwks_clients:
+        _jwks_clients[cache_key] = PyJWKClient(url, timeout=timeout_seconds)
+    return _jwks_clients[cache_key]
 
 
 def _extract_roles(claims: dict[str, Any]) -> set[str]:
