@@ -1,0 +1,2 @@
+"""KFC app installs backend."""
+
