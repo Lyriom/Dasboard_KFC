@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.aggregation import normalize_google, normalize_tiktok
+from app.aggregation import normalize_google, normalize_meta, normalize_tiktok
 from app.constants import GOOGLE_CAMPAIGN_EXACT
 
 
@@ -50,3 +50,17 @@ def test_tiktok_requires_descargas_and_kfc_tiktok_terms() -> None:
     assert normalize_tiktok(missing_descargas) is None
     assert normalize_tiktok(missing_kfc_tiktok) is None
 
+
+def test_meta_requires_app_promotion_objective() -> None:
+    valid = {
+        "date": "2026-06-01",
+        "account_id": "7266308733410766",
+        "campaign": "KFC_APP_INSTALLS",
+        "campaign_objective": "OUTCOME_APP_PROMOTION",
+        "spend": "80",
+        "actions_mobile_app_install": "40",
+    }
+    wrong_objective = valid | {"campaign_objective": "OUTCOME_TRAFFIC"}
+
+    assert normalize_meta(valid) is not None
+    assert normalize_meta(wrong_objective) is None
