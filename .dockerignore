@@ -1,0 +1,11 @@
+.env
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.sqlite
+*.db
+.coverage
+htmlcov/
+kfc_app_installs_backend.egg-info/
+.git/
