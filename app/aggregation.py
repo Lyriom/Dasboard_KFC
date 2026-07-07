@@ -181,13 +181,14 @@ def build_dashboard_payload(
     is_mock: bool = False,
     is_stale: bool = False,
     source_error: Optional[str] = None,
+    source: str = SOURCE,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "dashboardId": DASHBOARD_ID,
         "title": DASHBOARD_TITLE,
         "brand": BRAND,
         "isMock": is_mock,
-        "source": SOURCE,
+        "source": source,
         "updatedAt": isoformat_z(updated_at),
         "from": from_date.isoformat(),
         "to": to_date.isoformat(),
@@ -196,6 +197,7 @@ def build_dashboard_payload(
     }
     if is_stale:
         payload["isStale"] = True
+        payload["stale"] = True
     if source_error:
         payload["sourceError"] = source_error
     return payload
@@ -206,12 +208,14 @@ def sanitize_public_dashboard(payload: dict[str, Any]) -> dict[str, Any]:
         "dashboardId",
         "title",
         "brand",
+        "isMock",
         "source",
         "updatedAt",
         "from",
         "to",
         "weeks",
         "isStale",
+        "stale",
     }
     return {key: value for key, value in payload.items() if key in allowed}
 
