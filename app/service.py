@@ -66,8 +66,28 @@ def get_dashboard(
 
     if not force_refresh:
         snapshot = latest_snapshot(db, start, end)
-        if snapshot and _is_fresh(snapshot, settings):
-            return _prepare_payload(db, snapshot.payload_json, public=public)
+        if snapshot:
+            payload = dict(snapshot.payload_json)
+            if not _is_fresh(snapshot, settings):
+                payload["isStale"] = True
+                payload["stale"] = True
+            return _prepare_payload(db, payload, public=public)
+
+        rows = list_daily_rows(db, start, end)
+        if rows:
+            payload = _payload_from_rows(
+                db,
+                rows=rows,
+                from_date=start,
+                to_date=end,
+                updated_at=utcnow(),
+                is_stale=True,
+                source_error="snapshot_missing",
+            )
+            payload["source"] = "snapshot"
+            return _prepare_payload(db, payload, public=public)
+
+        raise DashboardUnavailable("No cached dashboard is available")
 
     try:
         payload = refresh_dashboard(db, settings, from_date=start, to_date=end)
@@ -77,6 +97,8 @@ def get_dashboard(
         if snapshot:
             payload = dict(snapshot.payload_json)
             payload["isStale"] = True
+            payload["stale"] = True
+            payload["source"] = "snapshot"
             payload["sourceError"] = "windsor_unavailable"
             return _prepare_payload(db, payload, public=public)
 
@@ -91,6 +113,7 @@ def get_dashboard(
                 is_stale=True,
                 source_error="windsor_unavailable",
             )
+            payload["source"] = "snapshot"
             return _prepare_payload(db, payload, public=public)
 
         raise DashboardUnavailable("No cached dashboard is available") from exc
