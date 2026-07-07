@@ -12,7 +12,7 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-By default the code can run with SQLite if `DATABASE_URL` is omitted. The included Docker setup runs the API with PostgreSQL.
+By default the code can run with SQLite if `DATABASE_URL` is omitted. The included Docker setup runs the API with MariaDB.
 
 ## Run with Docker
 
