@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base
 from app.models import KfcMundialSnapshot
-from app.mundial_service import refresh_mundial_dashboard
+from app.mundial_service import get_mundial_dashboard, refresh_mundial_dashboard
 from app.windsor import WindsorError
 
 
@@ -71,3 +71,71 @@ def test_refresh_mundial_dashboard_saves_partial_snapshot(monkeypatch) -> None:
     assert payload["google"]["DOM"][0][9] == 0.0
     assert "sourceError" in payload
     assert "google_ads failed with primary and fallback fields" in payload["sourceError"]
+
+
+def test_get_mundial_dashboard_ignores_fresh_zero_meta_attribution_snapshot(monkeypatch) -> None:
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
+    db.add(
+        KfcMundialSnapshot(
+            from_date=date(2026, 6, 11),
+            to_date=date(2026, 6, 11),
+            source_updated_at=datetime.now(timezone.utc),
+            payload_json=zero_meta_snapshot_payload(),
+        )
+    )
+    db.commit()
+    monkeypatch.setattr("app.mundial_service.WindsorClient", PartialWindsorClient)
+
+    payload = get_mundial_dashboard(
+        db,
+        FakeSettings(),
+        from_date=date(2026, 6, 11),
+        to_date=date(2026, 6, 11),
+    )
+
+    assert payload["meta"]["heavyUp"]["ADQ|DOM"]["v"] == [20.0]
+    assert db.query(KfcMundialSnapshot).count() == 2
+
+
+def zero_meta_snapshot_payload() -> dict:
+    zero_heavy = {
+        key: {"sp": [0], "im": [0], "cl": [0], "p": [0], "v": [0]}
+        for key in ("ADQ|DOM", "ADQ|EXP", "RET|DOM", "RET|EXP")
+    }
+    return {
+        "dashboardId": "kfc-mundial",
+        "title": "Mundial Heavy Up · KFC App",
+        "brand": "KFC",
+        "isMock": False,
+        "source": "windsor",
+        "updatedAt": "2026-07-13T22:00:00.000Z",
+        "from": "2026-06-11",
+        "to": "2026-06-11",
+        "days": ["2026-06-11"],
+        "meta": {
+            "heavyUp": zero_heavy,
+            "inst": {},
+            "events": {},
+            "extra30": {},
+            "extraChart": {},
+            "aon": {},
+            "aona": {},
+        },
+        "google": {"DOM": [], "EXP": []},
+        "googleDays": [],
+        "ventas": {"2026-06-11": [75955, 45769, 30186]},
+        "matchDays": ["2026-06-11"],
+        "ecuDays": [],
+        "matchDaysG": ["11 jun"],
+        "ecuDaysG": [],
+        "rules": {},
+        "shareToken": None,
+        "publicToken": None,
+    }

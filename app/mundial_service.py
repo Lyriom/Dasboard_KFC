@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.models import KfcMundialShare, KfcMundialSnapshot, utcnow
 from app.mundial import (
+    HEAVY_UP_KEYS,
     MUNDIAL_EXTRA30_END,
     MUNDIAL_GA4_FIELDS,
     MUNDIAL_GOOGLE_ADS_FALLBACK_FIELDS,
@@ -63,7 +64,12 @@ def get_mundial_dashboard(
     snapshot = latest_mundial_snapshot(db, start, end)
 
     if snapshot and not force_refresh and _is_fresh(snapshot, settings):
-        return _prepare_mundial_payload(db, dict(snapshot.payload_json), public_token=public_token)
+        payload = dict(snapshot.payload_json)
+        if _has_expected_meta_attribution(payload):
+            return _prepare_mundial_payload(db, payload, public_token=public_token)
+        logger.warning(
+            "Ignoring fresh kfc_mundial snapshot with zero Meta attribution; forcing refresh."
+        )
 
     try:
         payload = refresh_mundial_dashboard(db, settings, from_date=start, to_date=end)
@@ -308,3 +314,51 @@ def _is_fresh(snapshot: KfcMundialSnapshot, settings: Settings) -> bool:
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=timezone.utc)
     return updated_at >= utcnow() - timedelta(seconds=settings.cache_ttl_seconds)
+
+
+def _has_expected_meta_attribution(payload: dict) -> bool:
+    days = payload.get("days") or []
+    ventas = payload.get("ventas") or {}
+    if not isinstance(days, list) or not isinstance(ventas, dict):
+        return True
+
+    relevant_indexes = [
+        days.index(day)
+        for day in ventas
+        if isinstance(day, str) and day in days
+    ]
+    if not relevant_indexes:
+        return True
+
+    heavy_up = ((payload.get("meta") or {}).get("heavyUp") or {})
+    total_attributed_value = 0.0
+    for key in HEAVY_UP_KEYS:
+        series = heavy_up.get(key) or {}
+        spend = series.get("sp") or []
+        value = series.get("v") or []
+        grouped_value = _group_meta_value_by_spend_day(spend, value)
+        total_attributed_value += sum(grouped_value.get(index, 0.0) for index in relevant_indexes)
+    return total_attributed_value > 0
+
+
+def _group_meta_value_by_spend_day(spend: list, value: list) -> dict[int, float]:
+    grouped: dict[int, float] = {}
+    last_spend_index = -1
+    limit = min(len(spend), len(value))
+    for index in range(limit):
+        row_spend = _number(spend[index])
+        if row_spend > 0:
+            last_spend_index = index
+            grouped.setdefault(index, 0.0)
+        target_index = index if row_spend > 0 else last_spend_index
+        if target_index < 0:
+            continue
+        grouped[target_index] = grouped.get(target_index, 0.0) + _number(value[index])
+    return grouped
+
+
+def _number(value: object) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
