@@ -74,3 +74,32 @@ class KfcAppInstallsShare(Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_oid: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     created_by_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+
+
+class KfcMundialSnapshot(Base):
+    __tablename__ = "kfc_mundial_snapshots"
+    __table_args__ = (
+        Index("ix_kfc_mundial_snapshots_range_created", "from_date", "to_date", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    from_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    to_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    payload_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    source_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+
+class KfcMundialShare(Base):
+    __tablename__ = "kfc_mundial_share"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    share_token: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
+    shared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_oid: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    created_by_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
