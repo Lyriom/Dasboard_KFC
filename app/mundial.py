@@ -18,9 +18,10 @@ MUNDIAL_EXTRA30_END = date(2026, 7, 11)
 
 META_APP_ACCOUNT_ID = "7266308733410766"
 META_PYR_ACCOUNT_ID = "1170894797052218"
+GA4_ACCOUNT_ID = "204861780"
 GOOGLE_ADS_ACCOUNTS = {
-    ("DOM", "UAC"): "6975837337",
-    ("DOM", "ACE"): "1087316000",
+    ("DOM", "UAC"): "1087316000",
+    ("DOM", "ACE"): "6975837337",
     ("EXP", "UAC"): "7526036272",
     ("EXP", "ACE"): "7526036272",
 }
@@ -55,6 +56,7 @@ MUNDIAL_GOOGLE_ADS_FALLBACK_FIELDS = [
 ]
 MUNDIAL_GA4_FIELDS = [
     "date",
+    "account_id",
     "session_google_ads_campaign_name",
     "conversions_medios_purchase_delivery",
     "conversions_medios_purchase_express",
@@ -331,6 +333,9 @@ def _aggregate_google(
         day = _safe_parse_date(_value(row, "date"))
         if day not in day_set:
             continue
+        account_id = _account_id(row)
+        if account_id and account_id != GA4_ACCOUNT_ID:
+            continue
         campaign = _string(row, "session_google_ads_campaign_name")
         campaign_tokens = _tokens(campaign)
         if not {"ECU", "2026", "JULIO", "ONLINE"}.issubset(campaign_tokens):
@@ -433,8 +438,6 @@ def _classify_heavy_up(campaign: str, adset: str, account_id: str) -> Optional[s
         return None
     if {"DIA", "DEL", "POLLO"}.issubset(combined_tokens):
         return None
-    if "CUARTOS" not in combined_tokens:
-        return None
     channel = _meta_channel(combined_tokens)
     if not channel:
         return None
@@ -447,29 +450,31 @@ def _classify_heavy_up(campaign: str, adset: str, account_id: str) -> Optional[s
 def _classify_aon(campaign: str, adset: str, account_id: str) -> Optional[str]:
     if account_id and account_id != META_APP_ACCOUNT_ID:
         return None
-    campaign_tokens = _tokens(campaign)
-    if not {"RETENCION", "AON"}.issubset(campaign_tokens):
+    normalized_campaign = _normalized_text(campaign)
+    if "MUNDIAL APP" not in normalized_campaign or "RETENCION AON" not in normalized_campaign:
         return None
     adset_tokens = _tokens(adset)
     if "EXPRESS" in adset_tokens:
         return "e"
     if "DOMICILIO" in adset_tokens:
         return "d"
-    return "t"
+    if "CATALOGO" in adset_tokens or {"AON", "PROMOS"}.issubset(adset_tokens):
+        return "t"
+    return None
 
 
 def _classify_aona(campaign: str, adset: str, account_id: str) -> Optional[str]:
     if account_id and account_id != META_APP_ACCOUNT_ID:
         return None
-    campaign_tokens = _tokens(campaign)
+    normalized_campaign = _normalized_text(campaign)
     adset_tokens = _tokens(adset)
-    if "PARAGUAS" not in campaign_tokens:
-        return None
     if not {"MUNDIAL", "ADQUISICION"}.issubset(adset_tokens):
         return None
-    if "ESPACIO" in adset_tokens or "ESPACIO" in campaign_tokens:
+    if "PARAGUAS AUDIENCIA ESPACIO DIPPING LOW END MUNDIAL" in normalized_campaign:
         return "a"
-    return "m"
+    if "PARAGUAS AON DIPPING MUNDIAL" in normalized_campaign:
+        return "m"
+    return None
 
 
 def _classify_extra30(adset: str, account_id: str, day: date) -> Optional[str]:

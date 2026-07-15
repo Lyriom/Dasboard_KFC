@@ -27,6 +27,20 @@ def test_mundial_payload_aggregates_meta_and_google_contract() -> None:
                     "date": "2026-06-11",
                     "account_id": "7266308733410766",
                     "campaign": "ECU_2026_JULIO_KFC_META_HEAVY UP_MUNDIAL APP_ADQUISICION",
+                    "adset_name": "JUNIO_KFC_META_MOBILE/DESKTOP_OPEN PROSPECTING_APP_DOMICILIO_ADQUISICION_",
+                    "spend": "20",
+                    "actions_omni_purchase": "3",
+                    "action_values_omni_purchase": "40",
+                    "conversions_subscribe_total": "2",
+                    "conversions_start_trial_total": "4",
+                    "impressions": "200",
+                    "clicks": "19",
+                    "actions_mobile_app_install": "5",
+                },
+                {
+                    "date": "2026-06-11",
+                    "account_id": "7266308733410766",
+                    "campaign": "ECU_2026_JULIO_KFC_META_HEAVY UP_MUNDIAL APP_ADQUISICION",
                     "adset_name": "ADQUISICION DOMICILIO DIA DEL POLLO CUARTOS",
                     "spend": "999",
                     "actions_omni_purchase": "999",
@@ -66,6 +80,15 @@ def test_mundial_payload_aggregates_meta_and_google_contract() -> None:
                 {
                     "date": "2026-06-11",
                     "account_id": "7266308733410766",
+                    "campaign": "ECU_2026_JULIO_PARAGUAS_AON REACTIVAR_ACCIONES DE VALOR_PURCHASE_AON_APP_RETENCION_N/A_",
+                    "adset_name": "AON REACTIVAR",
+                    "spend": "999",
+                    "actions_omni_purchase": "999",
+                    "action_values_omni_purchase": "999",
+                },
+                {
+                    "date": "2026-06-11",
+                    "account_id": "7266308733410766",
                     "campaign": "ECU_2026_JULIO_PARAGUAS_AON DIPPING MUNDIAL_ADQUISICION",
                     "adset_name": "MAYO_MUNDIAL_ADQUISICION_",
                     "spend": "104.57",
@@ -77,13 +100,22 @@ def test_mundial_payload_aggregates_meta_and_google_contract() -> None:
                 {
                     "date": "2026-06-11",
                     "account_id": "7266308733410766",
-                    "campaign": "ECU_2026_JULIO_PARAGUAS_AUDIENCIA ESPACIO DIPPING_ADQUISICION",
+                    "campaign": "ECU_2026_JULIO_PARAGUAS_AUDIENCIA ESPACIO DIPPING_LOW END_MUNDIAL_ADQUISICION",
                     "adset_name": "AU ESPACIO MUNDIAL_MUNDIAL_ADQUISICION",
                     "spend": "32.25",
                     "actions_omni_purchase": "41",
                     "action_values_omni_purchase": "533.18",
                     "conversions_subscribe_total": "18",
                     "conversions_start_trial_total": "23",
+                },
+                {
+                    "date": "2026-06-11",
+                    "account_id": "7266308733410766",
+                    "campaign": "ECU_2026_JULIO_PARAGUAS_DESCARGAS ADVANTAGE_ADQUISICION",
+                    "adset_name": "DESCARGAS MUNDIAL ESPACIO ADVANTAGE_ADQUISICION",
+                    "spend": "999",
+                    "actions_omni_purchase": "999",
+                    "action_values_omni_purchase": "999",
                 },
                 {
                     "date": "2026-06-30",
@@ -107,9 +139,9 @@ def test_mundial_payload_aggregates_meta_and_google_contract() -> None:
                 },
             ],
             google_ads=[
-                google_row("697-583-7337", "DOMICILIO APP_UAC_ADQUISICION_N/A_", "388.14", "756"),
+                google_row("108-731-6000", "DOMICILIO APP_UAC_ADQUISICION_N/A_", "388.14", "756"),
                 google_row(
-                    "108-731-6000",
+                    "697-583-7337",
                     "DOMICILIO APP_ACE RETENCION DESARROLLAR_RETENCION_N/A_",
                     "444.42",
                     "999",
@@ -119,6 +151,13 @@ def test_mundial_payload_aggregates_meta_and_google_contract() -> None:
             ],
             ga4=[
                 ga4_row("DOMICILIO APP_UAC_ADQUISICION_N/A_", "1", "1", "1"),
+                ga4_row(
+                    "DOMICILIO APP_UAC_ADQUISICION_N/A_",
+                    "999",
+                    "999",
+                    "999",
+                    account_id="519268254",
+                ),
                 ga4_row("DOMICILIO APP_ACE RETENCION DESARROLLAR_RETENCION_N/A_", "1", "1", "1"),
                 ga4_row("EXPRESS_UAC_ADQUISICION_N/A_", "1", "1", "1"),
                 ga4_row("EXPRESS_ACE_RETENCION_N/A_", "1", "1", "1"),
@@ -133,10 +172,10 @@ def test_mundial_payload_aggregates_meta_and_google_contract() -> None:
     assert payload["isMock"] is False
     assert payload["source"] == "windsor"
     assert payload["days"] == ["2026-06-11"]
-    assert payload["meta"]["heavyUp"]["ADQ|DOM"]["sp"] == [10.1]
-    assert payload["meta"]["heavyUp"]["ADQ|DOM"]["p"] == [2]
-    assert payload["meta"]["inst"]["ADQ|DOM"] == [4]
-    assert payload["meta"]["events"]["ADQ|DOM"] == {"sub": [1], "tri": [3]}
+    assert payload["meta"]["heavyUp"]["ADQ|DOM"]["sp"] == [30.1]
+    assert payload["meta"]["heavyUp"]["ADQ|DOM"]["p"] == [5]
+    assert payload["meta"]["inst"]["ADQ|DOM"] == [9]
+    assert payload["meta"]["events"]["ADQ|DOM"] == {"sub": [3], "tri": [7]}
     assert payload["meta"]["aon"]["2026-06-11"]["t"] == [87.63, 193, 2539.64]
     assert payload["meta"]["aon"]["2026-06-11"]["e"] == [15.61, 25, 367.12, 12, 13]
     assert payload["meta"]["aona"]["2026-06-11"]["m"] == [104.57, 38, 597.58, 19, 21]
@@ -187,7 +226,7 @@ def test_google_non_override_day_uses_ga4_and_biddable_installs() -> None:
             meta=[],
             google_ads=[
                 google_row(
-                    "697-583-7337",
+                    "108-731-6000",
                     "DOMICILIO APP_UAC_ADQUISICION_N/A_",
                     "100",
                     "20",
@@ -242,9 +281,11 @@ def ga4_row(
     express: str,
     revenue: str,
     day: str = "2026-06-11",
+    account_id: str = "204861780",
 ) -> dict:
     return {
         "date": day,
+        "account_id": account_id,
         "session_google_ads_campaign_name": f"ECU_2026_JULIO_KFC_GOOGLE_ONLINE_{campaign_tail}",
         "conversions_medios_purchase_delivery": delivery,
         "conversions_medios_purchase_express": express,
