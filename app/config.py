@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     app_timezone: str = Field(default="America/Guayaquil", alias="APP_TIMEZONE")
     create_db_on_startup: bool = Field(default=True, alias="CREATE_DB_ON_STARTUP")
     scheduler_enabled: bool = Field(default=True, alias="SCHEDULER_ENABLED")
-    http_timeout_seconds: float = Field(default=10.0, alias="HTTP_TIMEOUT_SECONDS")
-    http_retries: int = Field(default=1, alias="HTTP_RETRIES")
+    http_timeout_seconds: float = Field(default=60.0, alias="HTTP_TIMEOUT_SECONDS")
+    http_retries: int = Field(default=3, alias="HTTP_RETRIES")
     public_rate_limit_requests: int = Field(default=60, alias="PUBLIC_RATE_LIMIT_REQUESTS")
     public_rate_limit_window_seconds: int = Field(
         default=60,

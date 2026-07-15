@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -22,6 +23,9 @@ from app.mundial import (
 )
 from app.security import AuthUser
 from app.windsor import WindsorClient, WindsorError
+
+
+logger = logging.getLogger(__name__)
 
 
 class MundialDashboardUnavailable(RuntimeError):
@@ -86,9 +90,44 @@ def refresh_mundial_dashboard(
     client = WindsorClient(settings)
     fetch_end = max(end, MUNDIAL_EXTRA30_END)
 
-    raw_meta = client.fetch_connector("facebook", MUNDIAL_META_FIELDS, MUNDIAL_START_DATE, fetch_end)
-    raw_google = _fetch_google_ads(client, start, end)
-    raw_ga4 = client.fetch_connector("googleanalytics4", MUNDIAL_GA4_FIELDS, start, end)
+    errors: list[str] = []
+    successful_connectors = 0
+
+    try:
+        raw_meta = _fetch_connector_or_raise(
+            client,
+            "facebook",
+            MUNDIAL_META_FIELDS,
+            MUNDIAL_START_DATE,
+            fetch_end,
+        )
+        successful_connectors += 1
+    except WindsorError as exc:
+        raw_meta = []
+        errors.append(str(exc))
+
+    try:
+        raw_google = _fetch_google_ads(client, start, end)
+        successful_connectors += 1
+    except WindsorError as exc:
+        raw_google = []
+        errors.append(str(exc))
+
+    try:
+        raw_ga4 = _fetch_connector_or_raise(
+            client,
+            "googleanalytics4",
+            MUNDIAL_GA4_FIELDS,
+            start,
+            end,
+        )
+        successful_connectors += 1
+    except WindsorError as exc:
+        raw_ga4 = []
+        errors.append(str(exc))
+
+    if successful_connectors == 0:
+        raise WindsorError("All Mundial Windsor connectors failed: " + "; ".join(errors))
 
     source_updated_at = utcnow()
     share = get_active_mundial_share(db)
@@ -98,6 +137,7 @@ def refresh_mundial_dashboard(
         to_date=end,
         updated_at=source_updated_at,
         share_token=share.share_token if share else None,
+        source_error="; ".join(errors) if errors else None,
     )
     db.add(
         KfcMundialSnapshot(
@@ -174,9 +214,77 @@ def get_mundial_share_by_token(db: Session, token: str) -> Optional[KfcMundialSh
 
 def _fetch_google_ads(client: WindsorClient, start: date, end: date) -> list[dict]:
     try:
-        return client.fetch_connector("google_ads", MUNDIAL_GOOGLE_ADS_FIELDS, start, end)
-    except WindsorError:
-        return client.fetch_connector("google_ads", MUNDIAL_GOOGLE_ADS_FALLBACK_FIELDS, start, end)
+        return _fetch_connector_or_raise(
+            client,
+            "google_ads",
+            MUNDIAL_GOOGLE_ADS_FIELDS,
+            start,
+            end,
+        )
+    except WindsorError as primary_exc:
+        logger.error(
+            "Retrying Windsor connector=google_ads with fallback fields after primary failure: %s",
+            primary_exc,
+        )
+        try:
+            return _fetch_connector_or_raise(
+                client,
+                "google_ads",
+                MUNDIAL_GOOGLE_ADS_FALLBACK_FIELDS,
+                start,
+                end,
+                label="google_ads fallback",
+            )
+        except WindsorError as fallback_exc:
+            raise WindsorError(
+                "google_ads failed with primary and fallback fields: "
+                f"primary={primary_exc}; fallback={fallback_exc}"
+            ) from fallback_exc
+
+
+def _fetch_connector_or_raise(
+    client: WindsorClient,
+    connector: str,
+    fields: list[str],
+    start: date,
+    end: date,
+    *,
+    label: Optional[str] = None,
+) -> list[dict]:
+    connector_label = label or connector
+    url = f"{client.base_url}/{connector}"
+    logger.info(
+        "Fetching Windsor connector=%s url=%s fields=%s date_from=%s date_to=%s",
+        connector_label,
+        url,
+        ",".join(fields),
+        start.isoformat(),
+        end.isoformat(),
+    )
+    try:
+        rows = client.fetch_connector(connector, fields, start, end)
+    except WindsorError as exc:
+        logger.error(
+            "Windsor connector=%s failed url=%s fields=%s date_from=%s date_to=%s error=%s",
+            connector_label,
+            url,
+            ",".join(fields),
+            start.isoformat(),
+            end.isoformat(),
+            exc,
+        )
+        raise WindsorError(f"{connector_label} failed: {exc}") from exc
+
+    logger.info(
+        "Windsor connector=%s ok rows=%s url=%s fields=%s date_from=%s date_to=%s",
+        connector_label,
+        len(rows),
+        url,
+        ",".join(fields),
+        start.isoformat(),
+        end.isoformat(),
+    )
+    return rows
 
 
 def _prepare_mundial_payload(
